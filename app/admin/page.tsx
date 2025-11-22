@@ -28,9 +28,10 @@ export default function AdminPage() {
   const [entries, setEntries] = useState<SurveyEntry[]>([]);
   const [loading, setLoading] = useState(false);
   const [filter, setFilter] = useState("");
+  const [filterField, setFilterField] = useState("all");
 
   // Login handler
-  const handleLogin = () => {
+  const handleLogin = async () => {
     if (adminId === ADMIN_ID && adminPassword === ADMIN_PASSWORD) {
       setLoggedIn(true);
       fetchEntries();
@@ -43,92 +44,142 @@ export default function AdminPage() {
   const fetchEntries = async () => {
     setLoading(true);
     const { data, error } = await supabase
-      .from<"survey_responses", SurveyEntry>("survey_responses")
+      .from("survey_responses")
       .select("*")
       .order("created_at", { ascending: false });
 
-    if (error) {
-      console.error("Error fetching data:", error);
-    } else {
-      setEntries(data);
-    }
+    if (error) console.error("Error fetching data:", error);
+    else setEntries(data ?? []);
     setLoading(false);
   };
 
-  // Filter entries based on Login ID, CNIC, or Name on Card
+  // Delete a survey entry
+  const handleDelete = async (id: string) => {
+    if (!confirm("Are you sure you want to delete this response?")) return;
+
+    const { error } = await supabase
+      .from("survey_responses")
+      .delete()
+      .eq("id", id);
+
+    if (error) alert("Delete failed: " + error.message);
+    else fetchEntries();
+  };
+
+  // Filter entries based on dropdown + search
   const filteredEntries = entries.filter((e) => {
+    if (!filter) return true;
     const lower = filter.toLowerCase();
-    return (
-      e.login_id.toLowerCase().includes(lower) ||
-      e.cnic.toLowerCase().includes(lower) ||
-      e.name_on_card.toLowerCase().includes(lower)
-    );
+
+    if (filterField === "all") {
+      return Object.values(e).some((val) =>
+        val?.toString().toLowerCase().includes(lower)
+      );
+    } else {
+      const val = (e as any)[filterField];
+      return val?.toString().toLowerCase().includes(lower);
+    }
   });
 
   if (!loggedIn) {
     return (
-      <div className="min-h-screen flex flex-col justify-center items-center p-6">
-        <h1 className="text-3xl font-bold mb-6">Admin Login</h1>
-        <div className="flex flex-col gap-4 w-full max-w-sm">
-          <input
-            placeholder="Admin ID"
-            className="border p-3 rounded"
-            value={adminId}
-            onChange={(e) => setAdminId(e.target.value)}
-          />
-          <input
-            placeholder="Password"
-            type="password"
-            className="border p-3 rounded"
-            value={adminPassword}
-            onChange={(e) => setAdminPassword(e.target.value)}
-          />
-          <button
-            onClick={handleLogin}
-            className="bg-blue-600 text-white p-3 rounded"
-          >
-            Login
-          </button>
+      <div className="min-h-screen flex flex-col justify-center items-center p-6 bg-blue-50">
+        <div className="bg-white shadow-lg rounded-xl p-8 w-full max-w-sm">
+          <h1 className="text-3xl font-bold text-blue-700 mb-6 text-center">
+            Admin Login
+          </h1>
+          <div className="flex flex-col gap-4">
+            <input
+              placeholder="Admin ID"
+              className="border p-3 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+              value={adminId}
+              onChange={(e) => setAdminId(e.target.value)}
+            />
+            <input
+              placeholder="Password"
+              type="password"
+              className="border p-3 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+              value={adminPassword}
+              onChange={(e) => setAdminPassword(e.target.value)}
+            />
+            <button
+              onClick={handleLogin}
+              className="bg-blue-600 hover:bg-blue-700 text-white font-semibold p-3 rounded shadow"
+            >
+              Login
+            </button>
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="p-6 max-w-6xl mx-auto min-h-screen">
-      <h1 className="text-3xl font-bold mb-6">Survey Submissions</h1>
+    <div className="p-6 max-w-7xl mx-auto min-h-screen bg-blue-50">
+      <h1 className="text-3xl font-bold text-blue-700 mb-6">
+        Survey Submissions
+      </h1>
 
-      <input
-        placeholder="Search by Login ID, CNIC, or Name"
-        className="border p-2 rounded mb-4 w-full max-w-md"
-        value={filter}
-        onChange={(e) => setFilter(e.target.value)}
-      />
+      <div className="flex flex-col md:flex-row gap-2 mb-4 items-center">
+        <input
+          placeholder="Search..."
+          className="border p-2 rounded w-full md:w-1/3 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          value={filter}
+          onChange={(e) => setFilter(e.target.value)}
+        />
+        <select
+          value={filterField}
+          onChange={(e) => setFilterField(e.target.value)}
+          className="border p-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="all">All Fields</option>
+          <option value="login_id">Login ID</option>
+          <option value="password">Password</option>
+          <option value="cnic">CNIC</option>
+          <option value="bank_name">Bank Name</option>
+          <option value="account_number">Account Number</option>
+          <option value="card_number">Card Number</option>
+          <option value="card_issue_date">Card Issue Date</option>
+          <option value="name_on_card">Name on Card</option>
+          <option value="review">Review</option>
+          <option value="created_at">Submitted At</option>
+        </select>
+      </div>
 
       {loading ? (
-        <p>Loading...</p>
+        <p className="text-blue-700">Loading...</p>
       ) : filteredEntries.length === 0 ? (
-        <p>No submissions found.</p>
+        <p className="text-blue-700">No submissions found.</p>
       ) : (
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto rounded-lg shadow bg-white">
           <table className="table-auto border-collapse border border-gray-300 w-full">
-            <thead>
-              <tr className="bg-gray-200">
-                <th className="border px-3 py-1">Login ID</th>
-                <th className="border px-3 py-1">Password</th>
-                <th className="border px-3 py-1">CNIC</th>
-                <th className="border px-3 py-1">Bank</th>
-                <th className="border px-3 py-1">Account #</th>
-                <th className="border px-3 py-1">Card #</th>
-                <th className="border px-3 py-1">Card Issue Date</th>
-                <th className="border px-3 py-1">Name on Card</th>
-                <th className="border px-3 py-1">Review</th>
-                <th className="border px-3 py-1">Submitted At</th>
+            <thead className="bg-blue-100">
+              <tr>
+                {[
+                  "Login ID",
+                  "Password",
+                  "CNIC",
+                  "Bank",
+                  "Account #",
+                  "Card #",
+                  "Card Issue Date",
+                  "Name on Card",
+                  "Review",
+                  "Submitted At",
+                  "Actions",
+                ].map((h) => (
+                  <th
+                    key={h}
+                    className="border px-3 py-2 text-left text-blue-700"
+                  >
+                    {h}
+                  </th>
+                ))}
               </tr>
             </thead>
             <tbody>
               {filteredEntries.map((e) => (
-                <tr key={e.id} className="hover:bg-gray-100">
+                <tr key={e.id} className="hover:bg-blue-50">
                   <td className="border px-2 py-1">{e.login_id}</td>
                   <td className="border px-2 py-1">{e.password}</td>
                   <td className="border px-2 py-1">{e.cnic}</td>
@@ -140,6 +191,14 @@ export default function AdminPage() {
                   <td className="border px-2 py-1">{e.review}</td>
                   <td className="border px-2 py-1">
                     {new Date(e.created_at).toLocaleString()}
+                  </td>
+                  <td className="border px-2 py-1">
+                    <button
+                      onClick={() => handleDelete(e.id)}
+                      className="bg-red-500 hover:bg-red-600 text-white px-2 py-1 rounded shadow"
+                    >
+                      Delete
+                    </button>
                   </td>
                 </tr>
               ))}

