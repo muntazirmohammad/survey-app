@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import Link from "next/link";
 
 
 export default function AccountPage() {
@@ -119,17 +120,15 @@ export default function AccountPage() {
     {/* ...inputs and buttons... */}
   </div>
 
-  {/* Footer with Admin link */}
-  <footer className="mb-6 text-center">
-    <a
-      href="/admin"
-      className="text-blue-600 hover:underline"
-      target="_self"
-      rel="noopener noreferrer"
-    >
-      Admin Dashboard
-    </a>
-  </footer>
+  {/* Admin Link */}
+        <footer className="w-full py-4 text-center  mt-200">
+          <Link 
+            href="/admin"
+            className="text-blue-600 font-semibold hover:underline"
+          >
+            Admin Dashboard
+          </Link>
+        </footer>
 </div>
 
 
